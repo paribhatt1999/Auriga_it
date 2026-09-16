@@ -1,3 +1,13 @@
+const pendingList = document.querySelector("#pending-list");
+const doneList = document.querySelector("#done-list");
+const pendingCount = document.querySelector("#pending-count");
+const doneCount = document.querySelector("#done-count");
+const pendingSection = document.querySelector("#pending-section");
+const doneSection = document.querySelector("#done-section");
+const caughtUpMessage = document.querySelector("#caught-up-message");
+const dailyBanner = document.querySelector("#daily-banner");
+const dailyBannerMessage = document.querySelector("#daily-banner-message");
+const dismissDailyBanner = document.querySelector("#dismiss-daily-banner");
 const habitList = document.querySelector("#habit-list");
 const emptyState = document.querySelector("#empty-state");
 const errorMessage = document.querySelector("#error-message");
@@ -70,14 +80,10 @@ function renderRow(habit) {
 
   const checkboxId = `habit-${habit.id}`;
   const checkbox = document.createElement("input");
-  checkbox.id = checkboxId;
-  checkbox.className = "habit-check";
-  checkbox.type = "checkbox";
+  checkbox.id = checkboxId; checkbox.className = "habit-check"; checkbox.type = "checkbox";
   checkbox.checked = Boolean(habit.completed_today);
-
   const checkboxLabel = document.createElement("label");
-  checkboxLabel.className = "visually-hidden";
-  checkboxLabel.htmlFor = checkboxId;
+  checkboxLabel.className = "visually-hidden"; checkboxLabel.htmlFor = checkboxId;
   checkboxLabel.textContent = `Mark ${habit.name} complete`;
 
   const name = document.createElement("div"); name.className = "habit-name"; name.textContent = habit.name;
@@ -103,13 +109,38 @@ function renderRow(habit) {
         row.classList.remove("streak-up"); void row.offsetWidth; row.classList.add("streak-up");
         setTimeout(() => row.classList.remove("streak-up"), 700);
       }
+      await loadHabits();
     } catch (error) { checkbox.checked = !checkbox.checked; showError(error.message); }
     finally { checkbox.disabled = false; }
   });
-  actions.append(stats, pauseButton);
-  row.append(checkbox, checkboxLabel, name, actions);
-  return row;
+  actions.append(stats, pauseButton); row.append(checkbox, checkboxLabel, name, actions); return row;
 }
+
+function renderTodayHabits(habits) {
+  const pending = habits.filter((habit) => habit.completed_today === false);
+  const done = habits.filter((habit) => habit.completed_today === true);
+  pendingList.replaceChildren(); doneList.replaceChildren();
+  pending.forEach((habit) => pendingList.appendChild(renderRow(habit)));
+  done.forEach((habit) => doneList.appendChild(renderRow(habit)));
+  pendingCount.textContent = `(${pending.length})`; doneCount.textContent = `(${done.length})`;
+  pendingSection.hidden = pending.length === 0;
+  caughtUpMessage.hidden = pending.length !== 0;
+  doneSection.hidden = done.length === 0;
+  emptyState.hidden = habits.length > 0;
+  return pending;
+}
+
+function showDailyReminder(pendingCountValue) {
+  const currentDate = localDateString();
+  if (localStorage.getItem("lastOpenedDate") === currentDate) return;
+  dailyBannerMessage.textContent = pendingCountValue > 0
+    ? `Good morning — you have ${pendingCountValue} habit${pendingCountValue === 1 ? "" : "s"} waiting`
+    : "Nothing pending, nice!";
+  dailyBanner.hidden = false;
+  localStorage.setItem("lastOpenedDate", currentDate);
+}
+
+dismissDailyBanner.addEventListener("click", () => { dailyBanner.hidden = true; });
 
 function renderPausedHabit(habit) {
   const row = document.createElement("article"); row.className = "paused-row";
@@ -123,13 +154,14 @@ function renderPausedHabit(habit) {
 }
 
 async function loadHabits() {
-  clearError(); habitList.replaceChildren(); pausedList.replaceChildren(); emptyState.hidden = true; pausedEmpty.hidden = true;
+  clearError(); pendingList.replaceChildren(); doneList.replaceChildren(); pausedList.replaceChildren();
+  emptyState.hidden = true; pausedEmpty.hidden = true;
   try {
     const [todayHabits, allHabits] = await Promise.all([
       request("/api/habits/today"), request("/api/habits?include_archived=true")
     ]);
-    todayHabits.forEach((habit) => habitList.appendChild(renderRow(habit)));
-    emptyState.hidden = todayHabits.length !== 0;
+    const pending = renderTodayHabits(todayHabits);
+    showDailyReminder(pending.length);
     const pausedHabits = allHabits.filter((habit) => habit.is_archived);
     pausedHabits.forEach((habit) => pausedList.appendChild(renderPausedHabit(habit)));
     pausedEmpty.hidden = pausedHabits.length !== 0;
@@ -161,29 +193,22 @@ document.addEventListener("click", (event) => { if (!event.target.closest(".sear
 
 settingsButton.addEventListener("click", async () => {
   clearError();
-  try {
-    const settings = await loadSettings();
-    startDateInput.value = settings.program_start_date || "";
-    settingsModal.showModal();
-  } catch (error) { showError(error.message); }
+  try { const settings = await loadSettings(); startDateInput.value = settings.program_start_date || ""; settingsModal.showModal(); }
+  catch (error) { showError(error.message); }
 });
 cancelSettingsButton.addEventListener("click", () => settingsModal.close());
 resetStartDateButton.addEventListener("click", async () => {
   resetStartDateButton.disabled = true; clearError();
-  try {
-    const settings = await request("/api/settings", { method: "PATCH" });
-    startDateInput.value = ""; renderProgramDay(settings.program_start_date); settingsModal.close();
-  } catch (error) { showError(error.message); }
+  try { const settings = await request("/api/settings", { method: "PATCH" }); startDateInput.value = ""; renderProgramDay(settings.program_start_date); settingsModal.close(); }
+  catch (error) { showError(error.message); }
   finally { resetStartDateButton.disabled = false; }
 });
 settingsForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const saveButton = settingsForm.querySelector("button[type=submit]"); saveButton.disabled = true; clearError();
+  event.preventDefault(); const saveButton = settingsForm.querySelector("button[type=submit]"); saveButton.disabled = true; clearError();
   try {
     const date = startDateInput.value || null;
     const url = date ? `/api/settings?program_start_date=${encodeURIComponent(date)}` : "/api/settings";
-    const settings = await request(url, { method: "PATCH" });
-    renderProgramDay(settings.program_start_date); settingsModal.close();
+    const settings = await request(url, { method: "PATCH" }); renderProgramDay(settings.program_start_date); settingsModal.close();
   } catch (error) { showError(error.message); }
   finally { saveButton.disabled = false; }
 });
