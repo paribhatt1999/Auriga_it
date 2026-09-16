@@ -11,6 +11,10 @@
     <header class="page-header">
       <p class="eyebrow">STREAK KEEPER</p>
       <h1 id="today-heading">Today</h1>
+      <div class="program-day-row">
+        <span id="program-day">Day 1 of 75</span>
+        <button id="settings-button" class="settings-button" type="button">Settings</button>
+      </div>
     </header>
 
     <section class="search-section" aria-label="Find a habit">
@@ -50,6 +54,21 @@
       </form>
     </section>
   </main>
+
+  <dialog id="settings-modal" class="settings-modal" aria-labelledby="settings-title">
+    <form id="settings-form" method="dialog">
+      <h2 id="settings-title">Program settings</h2>
+      <p class="settings-copy">Set the date your 75-day program started. Resetting clears the start date.</p>
+      <label for="program-start-date">Start date</label>
+      <input id="program-start-date" type="date">
+      <div class="modal-actions">
+        <button id="reset-start-date" class="secondary-button" type="button">Reset</button>
+        <button type="button" class="secondary-button" id="cancel-settings">Cancel</button>
+        <button type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="/static/app.js" defer></script>
 </body>
 </html>
