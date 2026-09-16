@@ -1,7 +1,8 @@
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select
+from sqlmodel import Session, SQLModel, select
 
 from ..database import get_session
 from ..models import Habit, HabitLog
@@ -10,12 +11,18 @@ from ..services.streaks import compute_streaks, is_scheduled
 router = APIRouter(prefix="/habits", tags=["habits"])
 
 
-class HabitCreate(Habit):
-    """Request model for creating a habit."""
+class HabitCreate(SQLModel):
+    """Request body for creating a habit."""
+
+    name: str
+    frequency: Literal["daily", "weekdays"]
 
 
-class HabitUpdate(Habit):
-    """Request model for updating a habit."""
+class HabitUpdate(SQLModel):
+    """Request body for partially updating a habit."""
+
+    name: str | None = None
+    frequency: Literal["daily", "weekdays"] | None = None
 
 
 def _habit_response(habit: Habit, session: Session) -> dict:
@@ -62,26 +69,7 @@ def list_habits(
     return session.exec(statement).all()
 
 
-@router.patch("/{habit_id}")
-def update_habit(
-    habit_id: int,
-    habit: HabitUpdate,
-    session: Session = Depends(get_session),
-):
-    """Update a habit's name and/or frequency."""
-    db_habit = session.get(Habit, habit_id)
-    if db_habit is None:
-        raise HTTPException(status_code=404, detail="Habit not found")
-
-    db_habit.name = habit.name
-    db_habit.frequency = habit.frequency
-    session.add(db_habit)
-    session.commit()
-    session.refresh(db_habit)
-    return db_habit
-
-
-@router.post("/today")
+@router.get("/today")
 def today_habits(session: Session = Depends(get_session)):
     """Return non-archived habits scheduled for today with streak data."""
     today = date.today()
@@ -93,6 +81,28 @@ def today_habits(session: Session = Depends(get_session)):
         for habit in habits
         if is_scheduled(habit, today)
     ]
+
+
+@router.patch("/{habit_id}")
+def update_habit(
+    habit_id: int,
+    habit: HabitUpdate,
+    session: Session = Depends(get_session),
+):
+    """Update the supplied name and/or frequency fields of a habit."""
+    db_habit = session.get(Habit, habit_id)
+    if db_habit is None:
+        raise HTTPException(status_code=404, detail="Habit not found")
+
+    if habit.name is not None:
+        db_habit.name = habit.name
+    if habit.frequency is not None:
+        db_habit.frequency = habit.frequency
+
+    session.add(db_habit)
+    session.commit()
+    session.refresh(db_habit)
+    return db_habit
 
 
 @router.post("/{habit_id}/archive")
