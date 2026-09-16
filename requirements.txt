@@ -3,3 +3,6 @@ uvicorn
 sqlmodel
 pytest
 httpx
+passlib[bcrypt]
+python-dotenv
+itsdangerous
