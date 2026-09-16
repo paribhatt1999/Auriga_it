@@ -7,6 +7,11 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <div id="daily-banner" class="daily-banner" role="status" hidden>
+    <span id="daily-banner-message"></span>
+    <button id="dismiss-daily-banner" class="banner-dismiss" type="button" aria-label="Dismiss reminder">Dismiss</button>
+  </div>
+
   <main class="container">
     <header class="page-header">
       <p class="eyebrow">STREAK KEEPER</p>
@@ -24,7 +29,17 @@
     </section>
 
     <section aria-labelledby="today-heading">
-      <div id="habit-list" class="habit-list" aria-live="polite"></div>
+      <section id="pending-section" class="today-section pending-section" aria-labelledby="pending-heading">
+        <h2 id="pending-heading">Still to log today <span id="pending-count"></span></h2>
+        <div id="pending-list" class="habit-list" aria-live="polite"></div>
+        <p id="caught-up-message" class="celebration-message" hidden>All caught up for today!</p>
+      </section>
+
+      <details id="done-section" class="today-section done-section">
+        <summary id="done-heading">Done today <span id="done-count"></span></summary>
+        <div id="done-list" class="habit-list" aria-live="polite"></div>
+      </details>
+
       <p id="empty-state" class="empty-state" hidden>No habits scheduled for today.</p>
       <p id="error-message" class="error" role="alert" hidden></p>
     </section>
