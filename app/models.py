@@ -21,3 +21,10 @@ class HabitLog(SQLModel, table=True):
     habit_id: int = Field(foreign_key="habit.id")
     date: date
     completed: bool = True
+
+
+class Settings(SQLModel, table=True):
+    """Singleton settings row containing the program start date."""
+
+    id: int = Field(default=1, primary_key=True)
+    program_start_date: Optional[date] = None
