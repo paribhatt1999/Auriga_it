@@ -15,7 +15,9 @@ from .routers.habits import router as habits_router
 from .routers.settings import router as settings_router
 
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-only-change-this-secret")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY must be set in .env")
 
 
 @asynccontextmanager
