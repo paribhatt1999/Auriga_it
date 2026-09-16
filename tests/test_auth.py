@@ -70,23 +70,30 @@ def test_habits_are_isolated_between_users(client):
     )
     assert second.status_code == 201
 
+    habit_id = habit.json()["id"]
     assert client.get("/api/habits").json() == []
-    assert client.get(f"/api/habits/{habit.json()['id']}/history").status_code == 404
-    assert client.post(f"/api/habits/{habit.json()['id']}/log").status_code == 404
+    assert client.get(f"/api/habits/{habit_id}/history").status_code == 404
+    assert client.post(f"/api/habits/{habit_id}/log").status_code == 404
     assert client.patch(
-        f"/api/habits/{habit.json()['id']}",
-        json={"name": "Stolen"},
+        f"/api/habits/{habit_id}", json={"name": "Stolen"}
     ).status_code == 404
-    assert client.post(f"/api/habits/{habit.json()['id']}/archive").status_code == 404
-    assert client.delete(f"/api/habits/{habit.json()['id']}").status_code == 404
+    assert client.post(f"/api/habits/{habit_id}/archive").status_code == 404
+    assert client.delete(f"/api/habits/{habit_id}").status_code == 404
+    assert client.patch("/api/habits/reorder", json=[habit_id]).status_code == 404
 
 
-def test_habit_routes_require_authentication(client):
-    routes = [
-        ("get", "/api/habits"),
-        ("get", "/api/habits/today"),
+def test_all_habit_routes_require_authentication(client):
+    requests = [
+        ("get", "/api/habits", None),
+        ("get", "/api/habits/today", None),
         ("post", "/api/habits", {"name": "Read", "frequency": "daily"}),
+        ("get", "/api/habits/1/history", None),
+        ("patch", "/api/habits/reorder", [1]),
+        ("patch", "/api/habits/1", {"name": "Read"}),
+        ("post", "/api/habits/1/archive", None),
+        ("delete", "/api/habits/1", None),
+        ("post", "/api/habits/1/log", None),
     ]
-    for method, path, *body in routes:
-        response = getattr(client, method)(path, json=body[0]) if body else getattr(client, method)(path)
+    for method, path, body in requests:
+        response = getattr(client, method)(path, json=body) if body is not None else getattr(client, method)(path)
         assert response.status_code == 401
