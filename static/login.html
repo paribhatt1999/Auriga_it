@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Log in — Streak Keeper</title>
   <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .auth-page { display: grid; place-items: center; min-height: 100vh; padding: 24px; background: #f5f7fb; }
+    .auth-card { width: min(100%, 420px); padding: 28px; background: #fff; border: 1px solid #dfe4ee; border-radius: 16px; box-shadow: 0 10px 30px rgba(23, 32, 51, .08); }
+    .auth-card h1 { margin: 0 0 6px; }
+    .auth-copy { margin: 0 0 22px; color: #536078; }
+    .auth-form { display: grid; gap: 9px; }
+    .auth-form input { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #8f98aa; border-radius: 10px; font: inherit; }
+    .auth-form .error { margin: 5px 0 0; }
+    .auth-switch { margin: 20px 0 0; color: #536078; text-align: center; font-size: .9rem; }
+    .auth-switch a { color: #263a75; font-weight: 800; }
+  </style>
 </head>
 <body class="auth-page">
   <main class="auth-card">
