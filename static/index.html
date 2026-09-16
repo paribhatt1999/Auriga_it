@@ -84,6 +84,14 @@
     </form>
   </dialog>
 
+  <dialog id="history-modal" class="history-modal" aria-labelledby="history-title">
+    <div class="history-modal-header">
+      <h2 id="history-title">Habit history</h2>
+      <button id="close-history" class="secondary-button history-close" type="button" aria-label="Close history">&times;</button>
+    </div>
+    <div id="history-calendar" class="history-calendar" aria-live="polite"></div>
+  </dialog>
+
   <script src="/static/app.js" defer></script>
 </body>
 </html>

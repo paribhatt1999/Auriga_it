@@ -7,7 +7,8 @@ from sqlmodel import Field, SQLModel, UniqueConstraint
 class Habit(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
-    frequency: Literal["daily", "weekdays"]
+    frequency: str
+    order: int = 0
     is_archived: bool = False
     created_at: date = Field(default_factory=date.today)
 
