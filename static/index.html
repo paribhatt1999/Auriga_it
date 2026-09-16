@@ -13,11 +13,24 @@
       <h1 id="today-heading">Today</h1>
     </header>
 
+    <section class="search-section" aria-label="Find a habit">
+      <label for="habit-search">Find a habit</label>
+      <input id="habit-search" class="search-input" type="search" autocomplete="off" placeholder="Search all habits...">
+      <div id="search-results" class="search-results" role="listbox" hidden></div>
+    </section>
+
     <section aria-labelledby="today-heading">
       <div id="habit-list" class="habit-list" aria-live="polite"></div>
       <p id="empty-state" class="empty-state" hidden>No habits scheduled for today.</p>
       <p id="error-message" class="error" role="alert" hidden></p>
     </section>
+
+    <details class="paused-section">
+      <summary>Paused</summary>
+      <p class="paused-note">Pausing preserves your history. When you bring a habit back, its streaks recompute naturally from its existing logs.</p>
+      <div id="paused-list" class="paused-list"></div>
+      <p id="paused-empty" class="empty-state" hidden>No paused habits.</p>
+    </details>
 
     <section class="add-section" aria-labelledby="add-heading">
       <h2 id="add-heading">Add habit</h2>
