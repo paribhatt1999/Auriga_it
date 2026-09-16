@@ -4,6 +4,13 @@ from typing import Literal, Optional
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
+class User(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    hashed_password: str
+    created_at: date = Field(default_factory=date.today)
+
+
 class Habit(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
@@ -11,6 +18,7 @@ class Habit(SQLModel, table=True):
     order: int = 0
     is_archived: bool = False
     created_at: date = Field(default_factory=date.today)
+    user_id: int = Field(foreign_key="user.id", index=True)
 
 
 class HabitLog(SQLModel, table=True):
