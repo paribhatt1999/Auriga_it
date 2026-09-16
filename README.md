@@ -10,6 +10,8 @@ Streak Keeper is a habit tracker for keeping daily or weekday habits on a schedu
 - **Database layer:** SQLModel
 - **Database:** SQLite
 - **Frontend:** vanilla HTML, CSS, and JavaScript
+- **Authentication:** Starlette `SessionMiddleware` with signed cookies and Passlib/bcrypt password hashing
+- **Configuration:** `python-dotenv`
 - **Testing:** pytest with FastAPI `TestClient` and in-memory SQLite fixtures
 
 There are no frontend frameworks or frontend build tools. The static files are served directly by FastAPI.
@@ -21,11 +23,13 @@ There are no frontend frameworks or frontend build tools. The static files are s
 ├── app/
 │   ├── __init__.py              # Python package marker.
 │   ├── database.py              # SQLite engine, table creation, and database sessions.
-│   ├── main.py                  # FastAPI application, routers, static files, and `/` frontend route.
-│   ├── models.py                # SQLModel database tables: Habit, HabitLog, and Settings.
+│   ├── dependencies.py          # Current-user authentication dependency.
+│   ├── main.py                  # FastAPI application, session middleware, routers, and frontend route.
+│   ├── models.py                # SQLModel database tables: User, Habit, HabitLog, and Settings.
 │   ├── schemas.py               # Pydantic request/response schemas and allowed frequency values.
 │   ├── routers/
 │   │   ├── __init__.py          # Router package marker.
+│   │   ├── auth.py               # Signup, login, logout, and current-user endpoints.
 │   │   ├── habits.py             # Habit CRUD, Today, history, reorder, archive, and logging endpoints.
 │   │   └── settings.py           # Program start-date settings endpoints.
 │   └── services/
@@ -36,10 +40,13 @@ There are no frontend frameworks or frontend build tools. The static files are s
 │   ├── app.js                    # Frontend state, API calls, rendering, history, and interactions.
 │   └── style.css                 # Layout, responsive styling, controls, cards, grids, and dialogs.
 ├── tests/
-│   ├── test_habits_api.py        # API tests using TestClient and an in-memory SQLite database.
+│   ├── conftest.py               # Test-only session secret configuration.
+│   ├── test_auth.py              # Authentication and per-user habit isolation tests.
+│   ├── test_habits_api.py        # Authenticated habit API tests using TestClient and SQLite.
 │   └── test_streaks.py            # Unit tests for streak calculation behavior.
+├── .env.example                   # Example environment configuration; copy to `.env` locally.
 ├── requirements.txt               # Python runtime and test dependencies.
-└── README.md                      # Project setup, API, and debugging documentation.
+└── README.md                      # Project setup, API, authentication, and debugging documentation.
 ```
 
 ## 4. Setup (from a fresh Codespace)
@@ -55,6 +62,14 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+Create your local environment file from the template and replace the placeholder with a long random secret:
+
+```bash
+cp .env.example .env
+```
+
+`.env` is ignored by Git and should not be committed because it contains the session signing secret.
 
 Once the virtual environment is activated, `uvicorn` is available directly as a command. You do not need `python -m uvicorn` unless there is a PATH issue.
 
@@ -81,25 +96,44 @@ With the virtual environment activated:
 pytest
 ```
 
+The test suite supplies its own `SECRET_KEY`, so a local `.env` is not required just to run tests.
+
 ## 7. API overview
 
-The habit router is mounted under `/api`, so the routes in `app/routers/habits.py` are exposed as follows:
+Authentication routes are mounted under `/api`:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/api/habits` | Create a new habit. |
-| `GET` | `/api/habits` | List habits, optionally including archived habits and filtering by name with `q`. |
-| `GET` | `/api/habits/today` | Return non-archived habits scheduled for today with completion and streak data. |
-| `GET` | `/api/habits/{habit_id}/history` | Return scheduled/completed status for the last requested number of calendar days (30 by default). |
-| `PATCH` | `/api/habits/reorder` | Set habit ordering from a supplied list of habit IDs. |
-| `PATCH` | `/api/habits/{habit_id}` | Update a habit's name and/or frequency. |
+| `POST` | `/api/signup` | Create a user, hash the password, start a session, and return public user data. |
+| `POST` | `/api/login` | Verify credentials and start a session. |
+| `POST` | `/api/logout` | Clear the current session. |
+| `GET` | `/api/me` | Return the current logged-in user or `401` if there is no session. |
+
+The habit router is also mounted under `/api`, so the routes in `app/routers/habits.py` are exposed as follows. All of these routes require an authenticated session and operate only on the current user's habits:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/habits` | Create a new habit for the logged-in user. |
+| `GET` | `/api/habits` | List the logged-in user's habits, optionally including archived habits and filtering by name with `q`. |
+| `GET` | `/api/habits/today` | Return the logged-in user's non-archived habits scheduled for today with completion and streak data. |
+| `GET` | `/api/habits/{habit_id}/history` | Return scheduled/completed status for the user's habit for the requested number of calendar days (30 by default). |
+| `PATCH` | `/api/habits/reorder` | Set ordering for the logged-in user's supplied habit IDs. |
+| `PATCH` | `/api/habits/{habit_id}` | Update the logged-in user's habit name and/or frequency. |
 | `POST` | `/api/habits/{habit_id}/archive` | Toggle a habit between active and archived states. |
 | `DELETE` | `/api/habits/{habit_id}` | Delete a habit and all of its log entries. |
 | `POST` | `/api/habits/{habit_id}/log` | Toggle today's completion log and return updated streak data. |
 
 The application also has a separate settings router mounted under `/api/settings` for reading and updating the program start date.
 
-## 8. Common issues / debugging
+## 8. Authentication notes
+
+Authentication uses Starlette's `SessionMiddleware`. The session is stored in a signed cookie, with the signing secret loaded from `SECRET_KEY` in the local `.env` file.
+
+Passwords are hashed with Passlib using bcrypt and are never returned by the API. The session stores the logged-in user's ID. Habit routes use the `get_current_user` dependency and filter database queries by `user_id`, so one user cannot read or modify another user's habits.
+
+If you change the database schema while using an existing local `streaks.db`, recreate the local SQLite database before starting the app so the new `User` and `Habit.user_id` columns are created.
+
+## 9. Common issues / debugging
 
 ### `uvicorn: command not found`
 
@@ -114,6 +148,16 @@ Or run Uvicorn through Python directly:
 ```bash
 python -m uvicorn app.main:app --reload --port 8000
 ```
+
+### `RuntimeError: SECRET_KEY must be set in .env`
+
+Create the local environment file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Then set a long random value for `SECRET_KEY`. Do not commit `.env`.
 
 ### `TypeError: issubclass() arg 1 must be a class` with a `Literal` field
 
@@ -146,7 +190,7 @@ git rebase --abort
 
 Check `is_scheduled()` in `app/services/streaks.py` first. Daily habits are scheduled every day, while weekday-only habits are scheduled Monday through Friday. Weekends should therefore be skipped rather than counted as missing days when weekday habits are used.
 
-## 9. Deployment (optional)
+## 10. Deployment (optional)
 
 For a simple Render or Railway deployment, install the dependencies with:
 
@@ -161,5 +205,7 @@ pip install -r requirements.txt
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
+
+Set `SECRET_KEY` as a platform environment variable in deployment rather than committing a `.env` file.
 
 For production deployment, configure persistent storage if the SQLite database needs to survive application/container replacement.
