@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 Frequency = Literal["daily", "weekdays"]
@@ -38,3 +38,16 @@ class HabitHistoryRead(BaseModel):
 	date: date
 	scheduled: bool
 	completed: bool
+
+
+class AuthCredentials(BaseModel):
+	email: EmailStr
+	password: str
+
+
+class UserRead(BaseModel):
+	model_config = ConfigDict(from_attributes=True)
+
+	id: int
+	email: EmailStr
+	created_at: date
