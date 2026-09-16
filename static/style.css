@@ -1,0 +1,68 @@
+* { box-sizing: border-box; }
+
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #172033;
+  background: #f5f7fb;
+}
+
+body { margin: 0; min-height: 100vh; }
+
+.container {
+  width: min(100% - 24px, 720px);
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.page-header { margin-bottom: 22px; }
+.eyebrow { margin: 0 0 5px; font-size: .75rem; font-weight: 800; letter-spacing: .12em; color: #68738a; }
+h1 { margin: 0; font-size: clamp(1.8rem, 7vw, 2.5rem); line-height: 1.15; }
+h2 { margin: 0 0 14px; font-size: 1.15rem; }
+
+.habit-list { display: grid; gap: 10px; }
+.habit-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #e1e5ed;
+  border-radius: 14px;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+.habit-row.streak-up { background: #fff8df; border-color: #e8c85b; transform: translateY(-1px); }
+
+.habit-check {
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  accent-color: #263a75;
+  cursor: pointer;
+}
+.habit-name { min-width: 0; font-size: 1rem; font-weight: 700; overflow-wrap: anywhere; }
+.stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; font-size: .9rem; white-space: nowrap; }
+.stat { padding: 7px 9px; border-radius: 9px; background: #f0f2f7; }
+
+.empty-state { padding: 20px; text-align: center; color: #68738a; background: #fff; border: 1px dashed #cbd1dd; border-radius: 14px; }
+.error { margin: 12px 0; padding: 12px; color: #8b1e2d; background: #fff0f2; border-radius: 10px; }
+
+.add-section { margin-top: 30px; padding: 18px; background: #fff; border: 1px solid #e1e5ed; border-radius: 14px; }
+.add-form { display: grid; gap: 10px; }
+label, legend { font-weight: 700; font-size: .9rem; }
+input[type="text"] { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid #cbd1dd; border-radius: 10px; font: inherit; }
+fieldset { margin: 4px 0; padding: 0; border: 0; }
+.frequency-toggle { display: flex; gap: 10px; margin-top: 8px; }
+.frequency-toggle label { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px; border: 1px solid #cbd1dd; border-radius: 10px; cursor: pointer; }
+.frequency-toggle input { width: 20px; height: 20px; }
+button { min-height: 50px; padding: 10px 16px; border: 0; border-radius: 10px; background: #263a75; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+button:disabled, .habit-check:disabled { opacity: .55; cursor: wait; }
+
+@media (min-width: 600px) {
+  .container { padding-top: 44px; }
+  .add-form { grid-template-columns: 1fr 1fr; align-items: end; }
+  .add-form > label, .add-form > input { grid-column: 1 / -1; }
+  .add-form fieldset { grid-column: 1; }
+  .add-form button { grid-column: 2; }
+}
