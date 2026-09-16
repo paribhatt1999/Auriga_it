@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import models
 from .database import create_db_and_tables
+from .routers.habits import router as habits_router
 
 
 @asynccontextmanager
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Streak Keeper", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(habits_router, prefix="/api")
 
 
 @app.get("/")
