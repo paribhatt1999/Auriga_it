@@ -1,10 +1,21 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-app = FastAPI(title="Streak Keeper")
+from . import models
+from .database import create_db_and_tables
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
+
+
+app = FastAPI(title="Streak Keeper", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
