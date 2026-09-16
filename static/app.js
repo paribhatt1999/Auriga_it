@@ -1,3 +1,13 @@
+async function requireAuth() {
+  const response = await fetch("/api/me", { credentials: "include" });
+  if (response.status === 401) {
+    window.location.replace("/static/login.html");
+    return false;
+  }
+  if (!response.ok) throw new Error(`Authentication check failed (${response.status})`);
+  return true;
+}
+
 const pendingList = document.querySelector("#pending-list");
 const doneList = document.querySelector("#done-list");
 const pendingCount = document.querySelector("#pending-count");
@@ -28,6 +38,7 @@ const historyModal = document.querySelector("#history-modal");
 const historyTitle = document.querySelector("#history-title");
 const historyCalendar = document.querySelector("#history-calendar");
 const closeHistory = document.querySelector("#close-history");
+const logoutButton = document.querySelector("#logout-button");
 
 const today = new Date();
 todayHeading.textContent = `Today — ${new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(today)}, ${new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year: "numeric" }).format(today)}`;
@@ -36,7 +47,11 @@ function showError(message) { errorMessage.textContent = message; errorMessage.h
 function clearError() { errorMessage.hidden = true; errorMessage.textContent = ""; }
 
 async function request(url, options = {}) {
-  const response = await fetch(url, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
   if (!response.ok) {
     let detail = `Request failed (${response.status})`;
     try { const body = await response.json(); detail = body.detail || detail; } catch (_) {}
@@ -349,6 +364,17 @@ async function loadHabits() {
 
 dismissDailyBanner.addEventListener("click", () => { dailyBanner.hidden = true; });
 closeHistory.addEventListener("click", () => historyModal.close());
+logoutButton.addEventListener("click", async () => {
+  logoutButton.disabled = true;
+  clearError();
+  try {
+    await request("/api/logout", { method: "POST" });
+    window.location.replace("/static/login.html");
+  } catch (error) {
+    showError(error.message);
+    logoutButton.disabled = false;
+  }
+});
 
 let searchTimer;
 async function searchHabits() {
@@ -404,4 +430,9 @@ addForm.addEventListener("submit", async (event) => {
   } catch (error) { showError(error.message); } finally { submitButton.disabled = false; }
 });
 
-Promise.all([loadSettings(), loadHabits()]).catch((error) => showError(error.message));
+requireAuth()
+  .then((authenticated) => {
+    if (!authenticated) return;
+    return Promise.all([loadSettings(), loadHabits()]);
+  })
+  .catch((error) => showError(error.message));
