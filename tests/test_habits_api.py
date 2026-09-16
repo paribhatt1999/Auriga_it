@@ -11,7 +11,7 @@ from app.main import app
 
 @pytest.fixture()
 def client():
-    """Provide a TestClient backed by a fresh in-memory SQLite database."""
+    """Provide an authenticated TestClient backed by fresh in-memory SQLite."""
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -25,6 +25,11 @@ def client():
 
     app.dependency_overrides[get_session] = override_get_session
     with TestClient(app) as test_client:
+        signup = test_client.post(
+            "/api/signup",
+            json={"email": "test@example.com", "password": "test-password"},
+        )
+        assert signup.status_code == 201
         yield test_client
     app.dependency_overrides.clear()
 
