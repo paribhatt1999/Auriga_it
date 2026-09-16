@@ -5,9 +5,6 @@ from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
 class Habit(SQLModel, table=True):
-    __tablename__ = "habit"
-    __table_args__ = (UniqueConstraint("name", name="uq_habit_name"),)
-
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     frequency: Literal["daily", "weekdays"]
@@ -16,7 +13,6 @@ class Habit(SQLModel, table=True):
 
 
 class HabitLog(SQLModel, table=True):
-    __tablename__ = "habit_log"
     __table_args__ = (
         UniqueConstraint("habit_id", "date", name="uq_habit_log_habit_date"),
     )
