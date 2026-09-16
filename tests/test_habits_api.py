@@ -1,13 +1,12 @@
-from datetime import date, timedelta
+from datetime import date
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
 from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from app.database import get_session
 from app.main import app
-from app.models import Habit, HabitLog
 
 
 @pytest.fixture()
@@ -31,38 +30,52 @@ def client():
 
 
 def test_today_returns_scheduled_habits_with_streaks(client):
-    response = client.post("/api/habits", json={"name": "Read", "frequency": "daily"})
+    habit = client.post(
+        "/api/habits", json={"name": "Read", "frequency": "daily"}
+    ).json()
+
+    response = client.post(f"/api/habits/{habit['id']}/log")
     assert response.status_code == 200
-    habit = response.json()
-    habit_id = habit["id"]
 
-    today = date.today()
-    with client as _:
-        pass
-
-    # Seed today's and yesterday's completion through the API.
-    client.post(f"/api/habits/{habit_id}/log")
     response = client.get("/api/habits/today")
-
     assert response.status_code == 200
     habits = response.json()
     assert len(habits) == 1
-    assert habits[0]["id"] == habit_id
+    assert habits[0]["id"] == habit["id"]
     assert habits[0]["completed_today"] is True
     assert habits[0]["current_streak"] == 1
     assert habits[0]["best_streak"] == 1
 
 
-def test_today_excludes_archived_and_unscheduled_weekday_habit(client):
-    daily = client.post("/api/habits", json={"name": "Daily", "frequency": "daily"}).json()
-    archived = client.post("/api/habits", json={"name": "Paused", "frequency": "daily"}).json()
+def test_today_excludes_archived_habits(client):
+    active = client.post(
+        "/api/habits", json={"name": "Daily", "frequency": "daily"}
+    ).json()
+    archived = client.post(
+        "/api/habits", json={"name": "Paused", "frequency": "daily"}
+    ).json()
     client.post(f"/api/habits/{archived['id']}/archive")
 
     response = client.get("/api/habits/today")
     assert response.status_code == 200
     ids = {habit["id"] for habit in response.json()}
-    assert daily["id"] in ids
+    assert active["id"] in ids
     assert archived["id"] not in ids
+
+
+def test_today_respects_weekdays_schedule(client):
+    habit = client.post(
+        "/api/habits", json={"name": "Weekday habit", "frequency": "weekdays"}
+    ).json()
+
+    response = client.get("/api/habits/today")
+    assert response.status_code == 200
+    ids = {item["id"] for item in response.json()}
+
+    if date.today().weekday() < 5:
+        assert habit["id"] in ids
+    else:
+        assert habit["id"] not in ids
 
 
 def test_log_creates_then_deletes_today_log_and_refreshes_streaks(client):
@@ -84,15 +97,16 @@ def test_log_creates_then_deletes_today_log_and_refreshes_streaks(client):
     assert second.json()["best_streak"] == 0
 
 
-def test_log_streak_grows_on_consecutive_days(client):
+def test_log_returns_fresh_streaks_after_existing_history(client):
     habit = client.post(
-        "/api/habits", json={"name": "Journal", "frequency": "daily"}
+        "/api/habits", json={"name": "Practice", "frequency": "daily"}
     ).json()
-    habit_id = habit["id"]
 
-    # The endpoint always logs today; verify that its returned streak data is fresh.
-    response = client.post(f"/api/habits/{habit_id}/log")
-    assert response.json()["current_streak"] == 1
+    first = client.post(f"/api/habits/{habit['id']}/log")
+    assert first.json()["current_streak"] == 1
+    assert first.json()["best_streak"] == 1
 
-    today = date.today()
-    assert today == date.today()
+    second = client.post(f"/api/habits/{habit['id']}/log")
+    assert second.json()["completed_today"] is False
+    assert second.json()["current_streak"] == 0
+    assert second.json()["best_streak"] == 0
