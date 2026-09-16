@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from ..database import get_session
-from ..models import Habit, HabitLog
+from ..dependencies import get_current_user
+from ..models import Habit, HabitLog, User
 from ..schemas import (
     HabitCreate,
     HabitHistoryRead,
@@ -38,9 +39,17 @@ def _habit_response(habit: Habit, session: Session) -> dict:
 
 
 @router.post("", response_model=HabitRead)
-def create_habit(habit: HabitCreate, session: Session = Depends(get_session)):
-    """Create and persist a new habit."""
-    db_habit = Habit(name=habit.name, frequency=habit.frequency)
+def create_habit(
+    habit: HabitCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Create and persist a new habit for the current user."""
+    db_habit = Habit(
+        name=habit.name,
+        frequency=habit.frequency,
+        user_id=current_user.id,
+    )
     session.add(db_habit)
     session.commit()
     session.refresh(db_habit)
@@ -51,10 +60,11 @@ def create_habit(habit: HabitCreate, session: Session = Depends(get_session)):
 def list_habits(
     include_archived: bool = False,
     q: str = Query(default=""),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """List habits with optional archived filtering and case-insensitive name search."""
-    statement = select(Habit)
+    """List only the current user's habits."""
+    statement = select(Habit).where(Habit.user_id == current_user.id)
     if not include_archived:
         statement = statement.where(Habit.is_archived == False)  # noqa: E712
     if q:
@@ -63,12 +73,18 @@ def list_habits(
 
 
 @router.get("/today", response_model=list[HabitTodayRead])
-def today_habits(session: Session = Depends(get_session)):
-    """Return non-archived habits scheduled for today with streak data."""
+def today_habits(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Return the current user's non-archived habits scheduled for today."""
     today = date.today()
     habits = session.exec(
         select(Habit)
-        .where(Habit.is_archived == False)  # noqa: E712
+        .where(
+            Habit.user_id == current_user.id,
+            Habit.is_archived == False,  # noqa: E712
+        )
         .order_by(Habit.order.asc())
     ).all()
     return [
@@ -82,10 +98,16 @@ def today_habits(session: Session = Depends(get_session)):
 def habit_history(
     habit_id: int,
     days: int = Query(default=30, ge=1),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Return scheduled and completed status for the last N calendar days."""
-    habit = session.get(Habit, habit_id)
+    """Return scheduled and completed status for the user's habit."""
+    habit = session.exec(
+        select(Habit).where(
+            Habit.id == habit_id,
+            Habit.user_id == current_user.id,
+        )
+    ).first()
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
 
@@ -116,18 +138,31 @@ def habit_history(
 
 
 @router.patch("/reorder")
-def reorder_habits(habit_ids: list[int], session: Session = Depends(get_session)):
-    """Update habit order values to match the supplied ID sequence."""
+def reorder_habits(
+    habit_ids: list[int],
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Update order values for the current user's supplied habit IDs."""
     if len(habit_ids) != len(set(habit_ids)):
         raise HTTPException(status_code=400, detail="Habit IDs must be unique")
 
-    habits = [session.get(Habit, habit_id) for habit_id in habit_ids]
-    if any(habit is None for habit in habits):
+    if not habit_ids:
+        return {"detail": "Habits reordered"}
+
+    habits = session.exec(
+        select(Habit).where(
+            Habit.id.in_(habit_ids),
+            Habit.user_id == current_user.id,
+        )
+    ).all()
+    if len(habits) != len(habit_ids):
         raise HTTPException(status_code=404, detail="Habit not found")
 
-    for index, habit in enumerate(habits):
-        habit.order = index
-        session.add(habit)
+    habits_by_id = {habit.id: habit for habit in habits}
+    for index, habit_id in enumerate(habit_ids):
+        habits_by_id[habit_id].order = index
+        session.add(habits_by_id[habit_id])
     session.commit()
     return {"detail": "Habits reordered"}
 
@@ -136,10 +171,16 @@ def reorder_habits(habit_ids: list[int], session: Session = Depends(get_session)
 def update_habit(
     habit_id: int,
     habit: HabitUpdate,
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    """Update the supplied name and/or frequency fields of a habit."""
-    db_habit = session.get(Habit, habit_id)
+    """Update the supplied fields of the current user's habit."""
+    db_habit = session.exec(
+        select(Habit).where(
+            Habit.id == habit_id,
+            Habit.user_id == current_user.id,
+        )
+    ).first()
     if db_habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
 
@@ -155,9 +196,18 @@ def update_habit(
 
 
 @router.post("/{habit_id}/archive", response_model=HabitRead)
-def toggle_archive(habit_id: int, session: Session = Depends(get_session)):
-    """Toggle a habit's archived state."""
-    habit = session.get(Habit, habit_id)
+def toggle_archive(
+    habit_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Toggle the archived state of the current user's habit."""
+    habit = session.exec(
+        select(Habit).where(
+            Habit.id == habit_id,
+            Habit.user_id == current_user.id,
+        )
+    ).first()
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
 
@@ -169,9 +219,18 @@ def toggle_archive(habit_id: int, session: Session = Depends(get_session)):
 
 
 @router.delete("/{habit_id}")
-def delete_habit(habit_id: int, session: Session = Depends(get_session)):
-    """Delete a habit and all of its log entries."""
-    habit = session.get(Habit, habit_id)
+def delete_habit(
+    habit_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Delete the current user's habit and all of its log entries."""
+    habit = session.exec(
+        select(Habit).where(
+            Habit.id == habit_id,
+            Habit.user_id == current_user.id,
+        )
+    ).first()
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
 
@@ -186,9 +245,18 @@ def delete_habit(habit_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("/{habit_id}/log", response_model=HabitTodayRead)
-def toggle_today_log(habit_id: int, session: Session = Depends(get_session)):
-    """Toggle today's log row and return the habit with fresh streaks."""
-    habit = session.get(Habit, habit_id)
+def toggle_today_log(
+    habit_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Toggle today's log row for the current user's habit."""
+    habit = session.exec(
+        select(Habit).where(
+            Habit.id == habit_id,
+            Habit.user_id == current_user.id,
+        )
+    ).first()
     if habit is None:
         raise HTTPException(status_code=404, detail="Habit not found")
 
