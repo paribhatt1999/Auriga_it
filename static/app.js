@@ -67,9 +67,19 @@ function renderRow(habit) {
   const row = document.createElement("article");
   row.className = "habit-row"; row.dataset.habitId = habit.id;
   row.dataset.currentStreak = habit.current_streak; row.dataset.bestStreak = habit.best_streak;
+
+  const checkboxId = `habit-${habit.id}`;
   const checkbox = document.createElement("input");
-  checkbox.className = "habit-check"; checkbox.type = "checkbox"; checkbox.checked = Boolean(habit.completed_today);
-  checkbox.setAttribute("aria-label", `Mark ${habit.name} complete`);
+  checkbox.id = checkboxId;
+  checkbox.className = "habit-check";
+  checkbox.type = "checkbox";
+  checkbox.checked = Boolean(habit.completed_today);
+
+  const checkboxLabel = document.createElement("label");
+  checkboxLabel.className = "visually-hidden";
+  checkboxLabel.htmlFor = checkboxId;
+  checkboxLabel.textContent = `Mark ${habit.name} complete`;
+
   const name = document.createElement("div"); name.className = "habit-name"; name.textContent = habit.name;
   const actions = document.createElement("div"); actions.className = "habit-actions";
   const stats = document.createElement("div"); stats.className = "stats";
@@ -79,6 +89,7 @@ function renderRow(habit) {
     try { await request(`/api/habits/${habit.id}/archive`, { method: "POST" }); await loadHabits(); }
     catch (error) { showError(error.message); pauseButton.disabled = false; }
   });
+
   checkbox.addEventListener("change", async () => {
     checkbox.disabled = true; clearError();
     const oldCurrent = Number(row.dataset.currentStreak), oldBest = Number(row.dataset.bestStreak);
@@ -95,7 +106,9 @@ function renderRow(habit) {
     } catch (error) { checkbox.checked = !checkbox.checked; showError(error.message); }
     finally { checkbox.disabled = false; }
   });
-  actions.append(stats, pauseButton); row.append(checkbox, name, actions); return row;
+  actions.append(stats, pauseButton);
+  row.append(checkbox, checkboxLabel, name, actions);
+  return row;
 }
 
 function renderPausedHabit(habit) {
@@ -154,29 +167,23 @@ settingsButton.addEventListener("click", async () => {
     settingsModal.showModal();
   } catch (error) { showError(error.message); }
 });
-
 cancelSettingsButton.addEventListener("click", () => settingsModal.close());
 resetStartDateButton.addEventListener("click", async () => {
   resetStartDateButton.disabled = true; clearError();
   try {
     const settings = await request("/api/settings", { method: "PATCH" });
-    startDateInput.value = "";
-    renderProgramDay(settings.program_start_date);
-    settingsModal.close();
+    startDateInput.value = ""; renderProgramDay(settings.program_start_date); settingsModal.close();
   } catch (error) { showError(error.message); }
   finally { resetStartDateButton.disabled = false; }
 });
-
 settingsForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const saveButton = settingsForm.querySelector("button[type=submit]");
-  saveButton.disabled = true; clearError();
+  const saveButton = settingsForm.querySelector("button[type=submit]"); saveButton.disabled = true; clearError();
   try {
     const date = startDateInput.value || null;
     const url = date ? `/api/settings?program_start_date=${encodeURIComponent(date)}` : "/api/settings";
     const settings = await request(url, { method: "PATCH" });
-    renderProgramDay(settings.program_start_date);
-    settingsModal.close();
+    renderProgramDay(settings.program_start_date); settingsModal.close();
   } catch (error) { showError(error.message); }
   finally { saveButton.disabled = false; }
 });
