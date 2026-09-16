@@ -1,2 +1,42 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Streak Keeper</title></head><body><h1>Streak Keeper</h1><p>Track your habits and keep your streaks going.</p></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Streak Keeper</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="page-header">
+      <p class="eyebrow">STREAK KEEPER</p>
+      <h1 id="today-heading">Today</h1>
+    </header>
+
+    <section aria-labelledby="today-heading">
+      <div id="habit-list" class="habit-list" aria-live="polite"></div>
+      <p id="empty-state" class="empty-state" hidden>No habits scheduled for today.</p>
+      <p id="error-message" class="error" role="alert" hidden></p>
+    </section>
+
+    <section class="add-section" aria-labelledby="add-heading">
+      <h2 id="add-heading">Add habit</h2>
+      <form id="add-habit-form" class="add-form">
+        <label for="habit-name">Name</label>
+        <input id="habit-name" name="name" type="text" maxlength="200" placeholder="e.g. Read 20 pages" required>
+
+        <fieldset>
+          <legend>Frequency</legend>
+          <div class="frequency-toggle">
+            <label><input type="radio" name="frequency" value="daily" checked> Daily</label>
+            <label><input type="radio" name="frequency" value="weekdays"> Weekdays</label>
+          </div>
+        </fieldset>
+
+        <button type="submit">Add habit</button>
+      </form>
+    </section>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
