@@ -3,6 +3,13 @@ const emptyState = document.querySelector("#empty-state");
 const errorMessage = document.querySelector("#error-message");
 const addForm = document.querySelector("#add-habit-form");
 const todayHeading = document.querySelector("#today-heading");
+const programDay = document.querySelector("#program-day");
+const settingsButton = document.querySelector("#settings-button");
+const settingsModal = document.querySelector("#settings-modal");
+const settingsForm = document.querySelector("#settings-form");
+const startDateInput = document.querySelector("#program-start-date");
+const resetStartDateButton = document.querySelector("#reset-start-date");
+const cancelSettingsButton = document.querySelector("#cancel-settings");
 const searchInput = document.querySelector("#habit-search");
 const searchResults = document.querySelector("#search-results");
 const pausedList = document.querySelector("#paused-list");
@@ -13,6 +20,7 @@ todayHeading.textContent = `Today — ${new Intl.DateTimeFormat(undefined, { wee
 
 function showError(message) { errorMessage.textContent = message; errorMessage.hidden = false; }
 function clearError() { errorMessage.hidden = true; errorMessage.textContent = ""; }
+
 async function request(url, options = {}) {
   const response = await fetch(url, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
   if (!response.ok) {
@@ -22,12 +30,39 @@ async function request(url, options = {}) {
   }
   return response.status === 204 ? null : response.json();
 }
+
+function localDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function programDayNumber(startDate) {
+  if (!startDate) return 1;
+  const start = new Date(`${startDate}T00:00:00`);
+  const current = new Date(`${localDateString()}T00:00:00`);
+  const days = Math.floor((current - start) / 86400000) + 1;
+  return Math.max(1, Math.min(75, days));
+}
+
+function renderProgramDay(startDate) {
+  programDay.textContent = `Day ${programDayNumber(startDate)} of 75`;
+}
+
+async function loadSettings() {
+  const settings = await request("/api/settings");
+  renderProgramDay(settings.program_start_date);
+  return settings;
+}
+
 function createActionButton(label, className, onClick) {
   const button = document.createElement("button");
   button.type = "button"; button.className = className; button.textContent = label;
   button.addEventListener("click", onClick);
   return button;
 }
+
 function renderRow(habit) {
   const row = document.createElement("article");
   row.className = "habit-row"; row.dataset.habitId = habit.id;
@@ -62,6 +97,7 @@ function renderRow(habit) {
   });
   actions.append(stats, pauseButton); row.append(checkbox, name, actions); return row;
 }
+
 function renderPausedHabit(habit) {
   const row = document.createElement("article"); row.className = "paused-row";
   const name = document.createElement("div"); name.className = "paused-name"; name.textContent = habit.name;
@@ -72,6 +108,7 @@ function renderPausedHabit(habit) {
   });
   row.append(name, button); return row;
 }
+
 async function loadHabits() {
   clearError(); habitList.replaceChildren(); pausedList.replaceChildren(); emptyState.hidden = true; pausedEmpty.hidden = true;
   try {
@@ -109,6 +146,41 @@ async function searchHabits() {
 searchInput.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(searchHabits, 180); });
 document.addEventListener("click", (event) => { if (!event.target.closest(".search-section")) searchResults.hidden = true; });
 
+settingsButton.addEventListener("click", async () => {
+  clearError();
+  try {
+    const settings = await loadSettings();
+    startDateInput.value = settings.program_start_date || "";
+    settingsModal.showModal();
+  } catch (error) { showError(error.message); }
+});
+
+cancelSettingsButton.addEventListener("click", () => settingsModal.close());
+resetStartDateButton.addEventListener("click", async () => {
+  resetStartDateButton.disabled = true; clearError();
+  try {
+    const settings = await request("/api/settings", { method: "PATCH" });
+    startDateInput.value = "";
+    renderProgramDay(settings.program_start_date);
+    settingsModal.close();
+  } catch (error) { showError(error.message); }
+  finally { resetStartDateButton.disabled = false; }
+});
+
+settingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const saveButton = settingsForm.querySelector("button[type=submit]");
+  saveButton.disabled = true; clearError();
+  try {
+    const date = startDateInput.value || null;
+    const url = date ? `/api/settings?program_start_date=${encodeURIComponent(date)}` : "/api/settings";
+    const settings = await request(url, { method: "PATCH" });
+    renderProgramDay(settings.program_start_date);
+    settingsModal.close();
+  } catch (error) { showError(error.message); }
+  finally { saveButton.disabled = false; }
+});
+
 addForm.addEventListener("submit", async (event) => {
   event.preventDefault(); const submitButton = addForm.querySelector("button[type=submit]"); submitButton.disabled = true; clearError();
   const formData = new FormData(addForm);
@@ -117,4 +189,5 @@ addForm.addEventListener("submit", async (event) => {
     addForm.reset(); await loadHabits();
   } catch (error) { showError(error.message); } finally { submitButton.disabled = false; }
 });
-loadHabits();
+
+Promise.all([loadSettings(), loadHabits()]).catch((error) => showError(error.message));
